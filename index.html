@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coop Corp — Books</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#ffffff;--bg2:#f5f5f3;--bg3:#eeede9;
+    --text:#1a1a1a;--text2:#6b6b6b;--text3:#999;
+    --border:#e0ddd6;--border2:#ccc;
+    --green:#1a7f4b;--green-bg:#eaf5ee;
+    --red:#c0392b;--red-bg:#fdecea;
+    --blue:#1a5fa8;--blue-bg:#e8f0fb;
+    --radius:8px;--radius-lg:12px;
+  }
+  @media(prefers-color-scheme:dark){
+    :root{
+      --bg:#1c1c1e;--bg2:#2c2c2e;--bg3:#3a3a3c;
+      --text:#f2f2f7;--text2:#aeaeb2;--text3:#636366;
+      --border:#3a3a3c;--border2:#48484a;
+      --green:#30d158;--green-bg:#0d2e1a;
+      --red:#ff453a;--red-bg:#2e0d0b;
+      --blue:#64a9ff;--blue-bg:#0d1f3c;
+    }
+  }
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg3);color:var(--text);min-height:100vh}
+  .app{max-width:800px;margin:0 auto;padding:2rem 1rem}
+  .header{margin-bottom:2rem}
+  .header h1{font-size:22px;font-weight:600;letter-spacing:-0.3px}
+  .header p{font-size:13px;color:var(--text2);margin-top:3px}
+  .tabs{display:flex;gap:2px;background:var(--bg2);border-radius:var(--radius);padding:3px;margin-bottom:1.5rem;width:fit-content}
+  .tab{padding:7px 18px;font-size:13px;font-weight:500;cursor:pointer;border:none;background:none;color:var(--text2);border-radius:6px;transition:all 0.15s}
+  .tab.active{background:var(--bg);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,0.12)}
+  .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1.5rem}
+  .metric{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px}
+  .metric-label{font-size:12px;color:var(--text2);margin-bottom:5px}
+  .metric-value{font-size:22px;font-weight:600;letter-spacing:-0.5px}
+  .green{color:var(--green)}.red{color:var(--red)}
+  .toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px}
+  .toolbar-left{display:flex;gap:8px;flex-wrap:wrap}
+  .toolbar-right{display:flex;gap:8px}
+  select,input[type=text],input[type=number],input[type=date],input[type=email],input[type=password]{
+    font-family:inherit;font-size:13px;padding:7px 10px;border:0.5px solid var(--border2);
+    border-radius:var(--radius);background:var(--bg);color:var(--text);outline:none;
+  }
+  select:focus,input:focus{border-color:var(--blue)}
+  button{font-family:inherit;cursor:pointer;border-radius:var(--radius);font-size:13px;font-weight:500;padding:7px 14px;border:none;transition:all 0.15s}
+  .btn-primary{background:var(--text);color:var(--bg)}
+  .btn-primary:hover{opacity:0.85}
+  .btn-secondary{background:var(--bg);color:var(--text);border:0.5px solid var(--border2)}
+  .btn-secondary:hover{background:var(--bg2)}
+  .btn-danger{background:none;color:var(--text3);border:none;padding:4px 8px;font-size:14px}
+  .btn-danger:hover{color:var(--red)}
+  .card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+  table{width:100%;border-collapse:collapse;table-layout:fixed}
+  th{font-size:11px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:0.05em;padding:10px 14px;border-bottom:0.5px solid var(--border);text-align:left;background:var(--bg2)}
+  td{padding:11px 14px;font-size:13px;border-bottom:0.5px solid var(--border);vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:var(--bg2)}
+  .amount-cell{text-align:right;font-variant-numeric:tabular-nums;font-weight:500}
+  .badge{display:inline-block;font-size:11px;padding:2px 8px;border-radius:100px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
+  .badge-income{background:var(--green-bg);color:var(--green)}
+  .badge-expense{background:var(--red-bg);color:var(--red)}
+  .empty{text-align:center;padding:3rem 1rem;color:var(--text2)}
+  .empty strong{display:block;margin-bottom:6px;color:var(--text)}
+  /* Sync status bar */
+  .sync-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;border-radius:var(--radius);font-size:12px;margin-bottom:1rem;border:0.5px solid var(--border);background:var(--bg)}
+  .sync-bar.synced{background:var(--green-bg);color:var(--green);border-color:var(--green)}
+  .sync-bar.busy{background:var(--blue-bg);color:var(--blue);border-color:var(--blue)}
+  .sync-bar.error{background:var(--red-bg);color:var(--red);border-color:var(--red)}
+  .sync-bar strong{font-weight:600}
+  .sync-bar-actions{display:flex;gap:6px;align-items:center;flex-shrink:0}
+  .sync-bar button{padding:4px 10px;font-size:12px;background:rgba(127,127,127,0.12);color:inherit;border:0.5px solid currentColor;border-radius:6px}
+  .sync-bar button:hover{background:rgba(127,127,127,0.25)}
+  /* Modal / overlay */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:100;padding:1rem}
+  .modal{background:var(--bg);border-radius:var(--radius-lg);padding:1.5rem;width:400px;max-width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+  .modal h2{font-size:17px;font-weight:600;margin-bottom:1.25rem}
+  .modal .sub{font-size:13px;color:var(--text2);margin-top:-0.85rem;margin-bottom:1.25rem}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:12px;color:var(--text2);font-weight:500;margin-bottom:5px}
+  .field input,.field select{width:100%}
+  .type-toggle{display:flex;gap:6px;margin-bottom:14px}
+  .type-btn{flex:1;padding:8px;border-radius:var(--radius);border:0.5px solid var(--border2);background:none;cursor:pointer;font-size:13px;font-weight:500;color:var(--text2)}
+  .type-btn.t-income{background:var(--green-bg);color:var(--green);border-color:var(--green)}
+  .type-btn.t-expense{background:var(--red-bg);color:var(--red);border-color:var(--red)}
+  .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:1.25rem}
+  .form-err{display:none;color:var(--red);font-size:12px;margin-bottom:10px}
+  /* P&L */
+  .pl-wrap{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem}
+  .pl-entity{font-size:17px;font-weight:600;margin-bottom:2px}
+  .pl-subtitle{font-size:13px;color:var(--text2);margin-bottom:1.5rem}
+  .pl-section{margin-bottom:1.5rem}
+  .pl-section-head{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--text2);padding-bottom:8px;border-bottom:0.5px solid var(--border);margin-bottom:8px}
+  .pl-row{display:flex;justify-content:space-between;padding:5px 0;font-size:14px}
+  .pl-row.indent{padding-left:16px;color:var(--text2)}
+  .pl-row.subtotal{font-weight:600;border-top:0.5px solid var(--border);margin-top:4px;padding-top:10px}
+  .pl-row.net{font-weight:700;font-size:16px;border-top:2px solid var(--border2);margin-top:6px;padding-top:12px}
+  .pl-num{font-variant-numeric:tabular-nums}
+  /* BS */
+  .bs-wrap{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem}
+  .bs-input{width:120px;text-align:right}
+  @media print{
+    body{background:white}
+    .no-print{display:none!important}
+    .app{max-width:100%;padding:0}
+  }
+  @media(max-width:600px){
+    .metrics{grid-template-columns:1fr 1fr}
+    .metric:last-child{grid-column:1/-1}
+    table th:nth-child(3),table td:nth-child(3){display:none}
+  }
+</style>
+</head>
+<body>
+
+<!-- ===================== LOGIN ===================== -->
+<div class="overlay" id="login-overlay" style="display:none">
+  <div class="modal">
+    <h2>Coop Corp — Books</h2>
+    <div class="sub">Sign in to your books.</div>
+    <form onsubmit="doLogin(event)">
+      <div class="field"><label>Email</label><input type="email" id="login-email" autocomplete="username" required></div>
+      <div class="field"><label>Password</label><input type="password" id="login-pw" autocomplete="current-password" required></div>
+      <div class="form-err" id="login-err"></div>
+      <button type="submit" class="btn-primary" id="login-btn" style="width:100%">Sign in</button>
+    </form>
+  </div>
+</div>
+
+<!-- ===================== APP ===================== -->
+<div class="app" style="display:none">
+  <div class="header">
+    <h1>Coop Corp</h1>
+    <p>Coop Holdings LLC · S-Corp · EIN: <span id="ein-display" onclick="editEIN()" style="cursor:pointer;text-decoration:underline dotted" title="Click to edit">click to add</span></p>
+  </div>
+
+  <div class="sync-bar no-print" id="sync-bar"><span>Loading…</span></div>
+
+  <div class="tabs no-print">
+    <button class="tab active" onclick="switchTab('ledger',this)">Ledger</button>
+    <button class="tab" onclick="switchTab('pl',this)">P&amp;L</button>
+    <button class="tab" onclick="switchTab('bs',this)">Balance Sheet</button>
+  </div>
+
+  <!-- LEDGER -->
+  <div id="tab-ledger">
+    <div class="metrics">
+      <div class="metric"><div class="metric-label">Total Income</div><div class="metric-value green" id="m-income">$0.00</div></div>
+      <div class="metric"><div class="metric-label">Total Expenses</div><div class="metric-value red" id="m-expense">$0.00</div></div>
+      <div class="metric"><div class="metric-label">Net</div><div class="metric-value" id="m-net">$0.00</div></div>
+    </div>
+    <div class="toolbar no-print">
+      <div class="toolbar-left">
+        <select id="filter-year" onchange="renderLedger()"><option value="all">All years</option></select>
+        <select id="filter-cat" onchange="renderLedger()">
+          <option value="all">All categories</option>
+          <optgroup label="Income" id="fcat-income"></optgroup>
+          <optgroup label="Expenses" id="fcat-expense"></optgroup>
+        </select>
+      </div>
+      <div class="toolbar-right">
+        <button class="btn-secondary" onclick="exportCSV()">↓ CSV</button>
+        <button class="btn-secondary" onclick="exportJSON()">↓ Backup</button>
+        <button class="btn-primary" onclick="openForm()">+ Add transaction</button>
+      </div>
+    </div>
+    <div class="card">
+      <table>
+        <thead><tr>
+          <th style="width:90px">Date</th>
+          <th>Description</th>
+          <th style="width:160px">Category</th>
+          <th style="width:110px;text-align:right">Amount</th>
+          <th style="width:36px" class="no-print"></th>
+        </tr></thead>
+        <tbody id="tx-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- P&L -->
+  <div id="tab-pl" style="display:none">
+    <div class="toolbar no-print" style="margin-bottom:1rem">
+      <div class="toolbar-left">
+        <select id="pl-year" onchange="renderPL()"><option value="all">All time</option></select>
+      </div>
+      <div class="toolbar-right">
+        <button class="btn-secondary" onclick="window.print()">⎙ Print</button>
+      </div>
+    </div>
+    <div class="pl-wrap" id="pl-content"></div>
+  </div>
+
+  <!-- Balance Sheet -->
+  <div id="tab-bs" style="display:none">
+    <div class="toolbar no-print" style="margin-bottom:1rem">
+      <div class="toolbar-right" style="margin-left:auto">
+        <button class="btn-secondary" onclick="window.print()">⎙ Print</button>
+      </div>
+    </div>
+    <div class="bs-wrap" id="bs-content"></div>
+  </div>
+</div>
+
+<!-- Add Transaction Modal -->
+<div class="overlay" id="modal" style="display:none" onclick="if(event.target===this)closeForm()">
+  <div class="modal">
+    <h2>Add transaction</h2>
+    <div class="type-toggle">
+      <button class="type-btn t-income" id="type-income" onclick="setType('income')">+ Income</button>
+      <button class="type-btn" id="type-expense" onclick="setType('expense')">− Expense</button>
+    </div>
+    <div class="field"><label>Date</label><input type="date" id="f-date"></div>
+    <div class="field"><label>Description</label><input type="text" id="f-desc" placeholder="e.g. Monthly retainer - Skoop"></div>
+    <div class="field"><label>Category</label><select id="f-cat"></select></div>
+    <div class="field"><label>Amount ($)</label><input type="number" id="f-amount" step="0.01" min="0.01" placeholder="0.00"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeForm()">Cancel</button>
+      <button class="btn-primary" id="save-btn" onclick="saveTx()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ============================================================
+   CONFIG — fill these in from your Supabase project.
+   Dashboard → Project Settings → API
+   ============================================================ */
+const SUPABASE_URL      = 'https://ptzcbpjjggiqarmgsdqd.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_OxKZWB_8x-1kJCJboE69fQ_g9zGBvDf';  // publishable key — safe in public pages
+/* ============================================================ */
+
+const INCOME_CATS = ['Consulting - Skoop','Consulting - Torque','Consulting - Aprevida','Consulting - Other','Aviation Services','Reimbursements received'];
+const EXPENSE_CATS = ['Vehicle - Fuel/EV','Vehicle - Insurance','Vehicle - Registration','Vehicle - Maintenance','Office','Equipment','Software/Subscriptions','Professional Services','Professional Training','Meals & Entertainment','Marketing & Advertising','Travel','Payroll - Owner W-2','Payroll Taxes','Contractor Payments','Fees & Licensing','Bank Fees','Other'];
+
+let sb = null;
+let txs = [], bs = {}, ein = '';
+let formType = 'income', activeTab = 'ledger', booted = false;
+
+/* ---------- Local cache (so the browser always holds a copy) ---------- */
+function loadCache(){
+  try{
+    txs = JSON.parse(localStorage.getItem('coop_txs')||'[]');
+    bs  = JSON.parse(localStorage.getItem('coop_bs')||'{}');
+    ein = localStorage.getItem('coop_ein')||'';
+  }catch(e){ txs=[]; bs={}; ein=''; }
+}
+function writeCache(){
+  try{
+    localStorage.setItem('coop_txs',JSON.stringify(txs));
+    localStorage.setItem('coop_bs',JSON.stringify(bs));
+    localStorage.setItem('coop_ein',ein);
+  }catch(e){}
+}
+
+/* ---------- Auth ---------- */
+function boot(){
+  if(SUPABASE_URL.indexOf('__')!==-1 || !window.supabase){
+    showLogin();
+    const e=document.getElementById('login-err');
+    e.style.display='block';
+    e.textContent='App not configured yet — Supabase URL/key still need to be filled in.';
+    document.getElementById('login-btn').disabled=true;
+    return;
+  }
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  sb.auth.onAuthStateChange((_event, session)=>{
+    if(session) showApp(); else showLogin();
+  });
+}
+
+async function doLogin(ev){
+  ev.preventDefault();
+  const email=document.getElementById('login-email').value.trim();
+  const pw=document.getElementById('login-pw').value;
+  const errEl=document.getElementById('login-err');
+  const btn=document.getElementById('login-btn');
+  errEl.style.display='none';
+  btn.disabled=true; btn.textContent='Signing in…';
+  const { error }=await sb.auth.signInWithPassword({email,password:pw});
+  if(error){
+    errEl.textContent=error.message||'Could not sign in.';
+    errEl.style.display='block';
+    btn.disabled=false; btn.textContent='Sign in';
+  }
+  // success is handled by onAuthStateChange
+}
+
+async function signOut(){
+  if(!confirm('Sign out of Coop Corp Books?')) return;
+  await sb.auth.signOut();
+}
+
+function showLogin(){
+  booted=false;
+  document.querySelector('.app').style.display='none';
+  document.getElementById('login-overlay').style.display='flex';
+  const btn=document.getElementById('login-btn');
+  btn.disabled=false; btn.textContent='Sign in';
+  document.getElementById('login-pw').value='';
+}
+
+function showApp(){
+  document.getElementById('login-overlay').style.display='none';
+  document.querySelector('.app').style.display='';
+  if(!booted){ booted=true; loadData(); }
+}
+
+/* ---------- Data load / save (Supabase) ---------- */
+async function loadData(){
+  setStatus('busy','Loading…');
+  loadCache();                       // show last-known data instantly
+  populateYearSelects(); renderLedger();
+  try{
+    const { data:txData, error:e1 } = await sb.from('transactions')
+      .select('*').order('date',{ascending:false}).order('created_at',{ascending:false});
+    if(e1) throw e1;
+    txs = txData.map(r=>({id:r.id,date:r.date,desc:r.description,cat:r.category,amount:Number(r.amount),type:r.type}));
+
+    const { data:setData, error:e2 } = await sb.from('settings').select('*').maybeSingle();
+    if(e2) throw e2;
+    bs  = (setData && setData.balance_sheet) || {};
+    ein = (setData && setData.ein) || '';
+
+    writeCache();
+    document.getElementById('ein-display').textContent = ein||'click to add';
+    populateYearSelects(); renderLedger();
+    if(activeTab==='pl') renderPL();
+    if(activeTab==='bs') renderBS();
+    setStatus('synced');
+  }catch(err){
+    console.error(err);
+    setStatus('error','Couldn’t reach the cloud — showing last saved copy');
+  }
+}
+
+async function saveSettings(){
+  setStatus('busy','Saving…');
+  try{
+    const { error } = await sb.from('settings')
+      .upsert({ein, balance_sheet:bs, updated_at:new Date().toISOString()},{onConflict:'user_id'});
+    if(error) throw error;
+    writeCache();
+    setStatus('synced');
+  }catch(err){
+    console.error(err);
+    setStatus('error','Save failed — check your connection');
+  }
+}
+
+/* ---------- Status bar ---------- */
+function setStatus(state,msg){
+  const bar=document.getElementById('sync-bar');
+  const t=new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+  const signout='<button onclick="signOut()">Sign out</button>';
+  if(state==='busy'){
+    bar.className='sync-bar busy no-print';
+    bar.innerHTML=`<span>${msg||'Working…'}</span><span class="sync-bar-actions">${signout}</span>`;
+  }else if(state==='synced'){
+    bar.className='sync-bar synced no-print';
+    bar.innerHTML=`<span>✓ Saved to cloud · ${t}</span><span class="sync-bar-actions">${signout}</span>`;
+  }else if(state==='error'){
+    bar.className='sync-bar error no-print';
+    bar.innerHTML=`<span>✗ ${msg||'Error'}</span>
+      <span class="sync-bar-actions"><button onclick="loadData()">Reload</button>${signout}</span>`;
+  }
+}
+
+/* ---------- Formatting helpers ---------- */
+function fmt(n){ return '$'+Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtDate(d){ const p=d.split('-'); return p[1]+'/'+p[2]+'/'+p[0]; }
+function getYears(){ return [...new Set(txs.map(t=>t.date.slice(0,4)))].sort().reverse(); }
+function snapshot(){ return {version:1,savedAt:new Date().toISOString(),ein,txs,bs}; }
+
+/* ---------- EIN ---------- */
+function editEIN(){
+  const v=prompt('Enter EIN (XX-XXXXXXX):',ein);
+  if(v!==null){
+    ein=v;
+    document.getElementById('ein-display').textContent=v||'click to add';
+    saveSettings();
+  }
+}
+
+/* ---------- Tabs ---------- */
+function switchTab(name,btn){
+  activeTab=name;
+  ['ledger','pl','bs'].forEach(t=>{ document.getElementById('tab-'+t).style.display=t===name?'':'none'; });
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  if(name==='pl') renderPL();
+  if(name==='bs') renderBS();
+}
+
+function populateYearSelects(){
+  const years=getYears();
+  ['filter-year','pl-year'].forEach(id=>{
+    const sel=document.getElementById(id);
+    const cur=sel.value;
+    while(sel.options.length>1) sel.remove(1);
+    years.forEach(y=>{ const o=document.createElement('option'); o.value=y; o.text=y; sel.appendChild(o); });
+    if(years.includes(cur)) sel.value=cur;
+  });
+  document.getElementById('fcat-income').innerHTML  = INCOME_CATS.map(c=>`<option value="${c}">${c}</option>`).join('');
+  document.getElementById('fcat-expense').innerHTML = EXPENSE_CATS.map(c=>`<option value="${c}">${c}</option>`).join('');
+}
+
+/* ---------- Ledger ---------- */
+function filterTxs(){
+  const yr=document.getElementById('filter-year').value;
+  const cat=document.getElementById('filter-cat').value;
+  return txs.filter(t=>(yr==='all'||t.date.startsWith(yr))&&(cat==='all'||t.cat===cat))
+            .sort((a,b)=>b.date.localeCompare(a.date));
+}
+
+function renderLedger(){
+  const list=filterTxs();
+  const inc=list.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+  const exp=list.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+  const net=inc-exp;
+  document.getElementById('m-income').textContent=fmt(inc);
+  document.getElementById('m-expense').textContent=fmt(exp);
+  const nm=document.getElementById('m-net');
+  nm.textContent=(net<0?'-':'')+fmt(net);
+  nm.className='metric-value '+(net>=0?'green':'red');
+
+  const body=document.getElementById('tx-body');
+  if(list.length===0){
+    body.innerHTML=`<tr><td colspan="5"><div class="empty"><strong>No transactions yet</strong>Click "+ Add transaction" to get started.</div></td></tr>`;
+    return;
+  }
+  body.innerHTML=list.map(t=>`
+    <tr>
+      <td style="color:var(--text2);font-size:12px">${fmtDate(t.date)}</td>
+      <td>${escapeHtml(t.desc)}</td>
+      <td><span class="badge badge-${t.type}">${escapeHtml(t.cat)}</span></td>
+      <td class="amount-cell ${t.type==='income'?'green':'red'}">${t.type==='income'?'+':'-'} ${fmt(t.amount)}</td>
+      <td class="no-print"><button class="btn-danger" onclick="deleteTx('${t.id}')" title="Delete">✕</button></td>
+    </tr>`).join('');
+}
+
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+async function deleteTx(id){
+  if(!confirm('Delete this transaction?')) return;
+  setStatus('busy','Deleting…');
+  try{
+    const { error }=await sb.from('transactions').delete().eq('id',id);
+    if(error) throw error;
+    txs=txs.filter(t=>t.id!==id);
+    writeCache(); populateYearSelects(); renderLedger();
+    setStatus('synced');
+  }catch(err){
+    console.error(err);
+    setStatus('error','Delete failed — nothing was changed');
+  }
+}
+
+/* ---------- Add transaction ---------- */
+function openForm(){
+  document.getElementById('f-date').value=new Date().toISOString().slice(0,10);
+  document.getElementById('f-desc').value='';
+  document.getElementById('f-amount').value='';
+  setType('income');
+  document.getElementById('modal').style.display='flex';
+  setTimeout(()=>document.getElementById('f-desc').focus(),50);
+}
+function closeForm(){ document.getElementById('modal').style.display='none'; }
+
+function setType(t){
+  formType=t;
+  document.getElementById('type-income').className='type-btn'+(t==='income'?' t-income':'');
+  document.getElementById('type-expense').className='type-btn'+(t==='expense'?' t-expense':'');
+  const sel=document.getElementById('f-cat');
+  const cats=t==='income'?INCOME_CATS:EXPENSE_CATS;
+  sel.innerHTML=cats.map(c=>`<option>${c}</option>`).join('');
+}
+
+async function saveTx(){
+  const date=document.getElementById('f-date').value;
+  const desc=document.getElementById('f-desc').value.trim();
+  const cat=document.getElementById('f-cat').value;
+  const amount=parseFloat(document.getElementById('f-amount').value);
+  if(!date||!desc||!amount||amount<=0){ alert('Please fill in all fields.'); return; }
+  const btn=document.getElementById('save-btn');
+  btn.disabled=true; btn.textContent='Saving…';
+  setStatus('busy','Saving…');
+  try{
+    const { data, error }=await sb.from('transactions')
+      .insert({date,description:desc,category:cat,amount,type:formType})
+      .select().single();
+    if(error) throw error;
+    txs.push({id:data.id,date:data.date,desc:data.description,cat:data.category,amount:Number(data.amount),type:data.type});
+    writeCache();
+    closeForm(); populateYearSelects(); renderLedger();
+    setStatus('synced');
+  }catch(err){
+    console.error(err);
+    setStatus('error','Save failed — transaction not recorded');
+    alert('Could not save: '+(err.message||err));
+  }finally{
+    btn.disabled=false; btn.textContent='Save';
+  }
+}
+
+/* ---------- Exports ---------- */
+function exportJSON(){
+  const blob=new Blob([JSON.stringify(snapshot(),null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`CoopCorp_Books_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+
+function exportCSV(){
+  const list=filterTxs();
+  const rows=[['Date','Description','Category','Type','Amount'],
+    ...list.map(t=>[t.date,'"'+t.desc.replace(/"/g,'""')+'"',t.cat,t.type,t.amount.toFixed(2)])];
+  const csv=rows.map(r=>r.join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download='CoopCorp_Ledger_'+document.getElementById('filter-year').value+'.csv';
+  a.click();
+}
+
+/* ---------- P&L ---------- */
+function buildPL(year){
+  const list=txs.filter(t=>year==='all'||t.date.startsWith(year));
+  const inc={}, exp={};
+  INCOME_CATS.forEach(c=>inc[c]=0);
+  EXPENSE_CATS.forEach(c=>exp[c]=0);
+  list.forEach(t=>{ if(t.type==='income') inc[t.cat]=(inc[t.cat]||0)+t.amount; else exp[t.cat]=(exp[t.cat]||0)+t.amount; });
+  return {inc,exp,totalInc:Object.values(inc).reduce((a,b)=>a+b,0),totalExp:Object.values(exp).reduce((a,b)=>a+b,0)};
+}
+
+function renderPL(){
+  const yr=document.getElementById('pl-year').value;
+  const {inc,exp,totalInc,totalExp}=buildPL(yr);
+  const net=totalInc-totalExp;
+  const period=yr==='all'?'All time':('January 1 – December 31, '+yr);
+  document.getElementById('pl-content').innerHTML=`
+    <div class="pl-entity">Coop Holdings LLC (Coop Corp)</div>
+    <div class="pl-subtitle">Profit & Loss · ${period}</div>
+    <div class="pl-section">
+      <div class="pl-section-head">Revenue</div>
+      ${INCOME_CATS.filter(c=>inc[c]>0).map(c=>`<div class="pl-row indent"><span>${c}</span><span class="pl-num">${fmt(inc[c])}</span></div>`).join('')}
+      ${Object.values(inc).every(v=>v===0)?'<div class="pl-row indent" style="color:var(--text3)"><span>No revenue recorded</span><span>—</span></div>':''}
+      <div class="pl-row subtotal"><span>Total Revenue</span><span class="pl-num green">${fmt(totalInc)}</span></div>
+    </div>
+    <div class="pl-section">
+      <div class="pl-section-head">Operating Expenses</div>
+      ${EXPENSE_CATS.filter(c=>exp[c]>0).map(c=>`<div class="pl-row indent"><span>${c}</span><span class="pl-num">${fmt(exp[c])}</span></div>`).join('')}
+      ${Object.values(exp).every(v=>v===0)?'<div class="pl-row indent" style="color:var(--text3)"><span>No expenses recorded</span><span>—</span></div>':''}
+      <div class="pl-row subtotal"><span>Total Expenses</span><span class="pl-num red">${fmt(totalExp)}</span></div>
+    </div>
+    <div class="pl-row net"><span>Net Income</span><span class="pl-num ${net>=0?'green':'red'}">${net<0?'-':''}${fmt(net)}</span></div>`;
+}
+
+/* ---------- Balance Sheet ---------- */
+function renderBS(){
+  const fields=[
+    {label:'Assets',items:[
+      {key:'cash',label:'Cash (checking/savings)'},
+      {key:'ar',label:'Accounts Receivable'},
+      {key:'skoop_stock',label:'Skoop stock held (at cost)'},
+      {key:'prepaid',label:'Prepaid expenses'},
+    ]},
+    {label:'Liabilities',items:[
+      {key:'ap',label:'Accounts Payable'},
+      {key:'cc',label:'Credit card balance'},
+      {key:'loans',label:'Loans payable'},
+    ]}
+  ];
+  function section(f){
+    return `<div class="pl-section">
+      <div class="pl-section-head">${f.label}</div>
+      ${f.items.map(it=>`
+      <div class="pl-row indent">
+        <span>${it.label}</span>
+        <span><input class="bs-input" type="number" step="0.01" placeholder="0.00" value="${bs[it.key]||''}"
+          onchange="bs['${it.key}']=parseFloat(this.value)||0;recalcBS();saveSettings()" style="width:120px;text-align:right;font-size:13px;padding:4px 8px"></span>
+      </div>`).join('')}
+      <div class="pl-row subtotal">
+        <span>Total ${f.label}</span><span class="pl-num" id="bs-total-${f.label.toLowerCase()}">$0.00</span>
+      </div>
+    </div>`;
+  }
+  document.getElementById('bs-content').innerHTML=`
+    <div class="pl-entity">Coop Holdings LLC (Coop Corp)</div>
+    <div class="pl-subtitle">Balance Sheet · As of ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</div>
+    ${fields.map(section).join('')}
+    <div class="pl-row net"><span>Owner's Equity</span><span class="pl-num" id="bs-equity">$0.00</span></div>`;
+  recalcBS();
+}
+
+function recalcBS(){
+  const assetKeys=['cash','ar','skoop_stock','prepaid'];
+  const liabKeys=['ap','cc','loans'];
+  const ta=assetKeys.reduce((s,k)=>s+(bs[k]||0),0);
+  const tl=liabKeys.reduce((s,k)=>s+(bs[k]||0),0);
+  const eq=ta-tl;
+  const el1=document.getElementById('bs-total-assets');
+  const el2=document.getElementById('bs-total-liabilities');
+  const el3=document.getElementById('bs-equity');
+  if(el1) el1.textContent=fmt(ta);
+  if(el2) el2.textContent=fmt(tl);
+  if(el3){ el3.textContent=(eq<0?'-':'')+fmt(eq); el3.className='pl-num '+(eq>=0?'green':'red'); }
+}
+
+/* ---------- Go ---------- */
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeForm(); });
+boot();
+</script>
+</body>
+</html>
