@@ -53,6 +53,8 @@
   .btn-secondary:hover{background:var(--bg2)}
   .btn-danger{background:none;color:var(--text3);border:none;padding:4px 8px;font-size:14px}
   .btn-danger:hover{color:var(--red)}
+  .btn-icon{background:none;color:var(--text3);border:none;padding:4px 6px;font-size:14px}
+  .btn-icon:hover{color:var(--blue)}
   .card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
   table{width:100%;border-collapse:collapse;table-layout:fixed}
   th{font-size:11px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:0.05em;padding:10px 14px;border-bottom:0.5px solid var(--border);text-align:left;background:var(--bg2)}
@@ -174,7 +176,7 @@
           <th>Description</th>
           <th style="width:160px">Category</th>
           <th style="width:110px;text-align:right">Amount</th>
-          <th style="width:36px" class="no-print"></th>
+          <th style="width:70px" class="no-print"></th>
         </tr></thead>
         <tbody id="tx-body"></tbody>
       </table>
@@ -208,7 +210,7 @@
 <!-- Add Transaction Modal -->
 <div class="overlay" id="modal" style="display:none" onclick="if(event.target===this)closeForm()">
   <div class="modal">
-    <h2>Add transaction</h2>
+    <h2 id="modal-title">Add transaction</h2>
     <div class="type-toggle">
       <button class="type-btn t-income" id="type-income" onclick="setType('income')">+ Income</button>
       <button class="type-btn" id="type-expense" onclick="setType('expense')">− Expense</button>
@@ -243,11 +245,18 @@ let EXPENSE_CATS = [...DEFAULT_EXPENSE_CATS];
 function rebuildCats(){
   INCOME_CATS  = [...DEFAULT_INCOME_CATS,  ...customCats.income];
   EXPENSE_CATS = [...DEFAULT_EXPENSE_CATS, ...customCats.expense];
+  // Also surface any category already used by a transaction, so a category never
+  // disappears from the dropdown / P&L even if the saved custom list is incomplete.
+  txs.forEach(t=>{
+    const list = t.type==='income' ? INCOME_CATS : EXPENSE_CATS;
+    if(t.cat && !list.includes(t.cat)) list.push(t.cat);
+  });
 }
 
 let sb = null;
 let txs = [], bs = {}, ein = '';
 let formType = 'income', activeTab = 'ledger', booted = false;
+let editingId = null;   // null = adding a new transaction; otherwise the id being edited
 
 /* ---------- Local cache (so the browser always holds a copy) ---------- */
 function loadCache(){
@@ -460,7 +469,7 @@ function renderLedger(){
       <td>${escapeHtml(t.desc)}</td>
       <td><span class="badge badge-${t.type}">${escapeHtml(t.cat)}</span></td>
       <td class="amount-cell ${t.type==='income'?'green':'red'}">${t.type==='income'?'+':'-'} ${fmt(t.amount)}</td>
-      <td class="no-print"><button class="btn-danger" onclick="deleteTx('${t.id}')" title="Delete">✕</button></td>
+      <td class="no-print" style="white-space:nowrap"><button class="btn-icon" onclick="openEditForm('${t.id}')" title="Edit">✎</button><button class="btn-danger" onclick="deleteTx('${t.id}')" title="Delete">✕</button></td>
     </tr>`).join('');
 }
 
@@ -483,6 +492,8 @@ async function deleteTx(id){
 
 /* ---------- Add transaction ---------- */
 function openForm(){
+  editingId=null;
+  document.getElementById('modal-title').textContent='Add transaction';
   document.getElementById('f-date').value=new Date().toISOString().slice(0,10);
   document.getElementById('f-desc').value='';
   document.getElementById('f-amount').value='';
@@ -490,7 +501,22 @@ function openForm(){
   document.getElementById('modal').style.display='flex';
   setTimeout(()=>document.getElementById('f-desc').focus(),50);
 }
-function closeForm(){ document.getElementById('modal').style.display='none'; }
+
+function openEditForm(id){
+  const t=txs.find(x=>x.id===id);
+  if(!t) return;
+  editingId=id;
+  document.getElementById('modal-title').textContent='Edit transaction';
+  setType(t.type);                                  // builds the category dropdown
+  document.getElementById('f-cat').value=t.cat;     // then pick the existing category
+  document.getElementById('f-date').value=t.date;
+  document.getElementById('f-desc').value=t.desc;
+  document.getElementById('f-amount').value=t.amount;
+  document.getElementById('modal').style.display='flex';
+  setTimeout(()=>document.getElementById('f-desc').focus(),50);
+}
+
+function closeForm(){ document.getElementById('modal').style.display='none'; editingId=null; }
 
 function setType(t){
   formType=t;
@@ -528,21 +554,32 @@ async function saveTx(){
   const cat=document.getElementById('f-cat').value;
   const amount=parseFloat(document.getElementById('f-amount').value);
   if(!date||!desc||!amount||amount<=0){ alert('Please fill in all fields.'); return; }
+  if(cat==='__new__'){ alert('Please pick a category.'); return; }
   const btn=document.getElementById('save-btn');
   btn.disabled=true; btn.textContent='Saving…';
   setStatus('busy','Saving…');
   try{
-    const { data, error }=await sb.from('transactions')
-      .insert({date,description:desc,category:cat,amount,type:formType})
-      .select().single();
+    const row={date,description:desc,category:cat,amount,type:formType};
+    let data, error;
+    if(editingId){
+      ({ data, error }=await sb.from('transactions').update(row).eq('id',editingId).select().single());
+    }else{
+      ({ data, error }=await sb.from('transactions').insert(row).select().single());
+    }
     if(error) throw error;
-    txs.push({id:data.id,date:data.date,desc:data.description,cat:data.category,amount:Number(data.amount),type:data.type});
+    const tx={id:data.id,date:data.date,desc:data.description,cat:data.category,amount:Number(data.amount),type:data.type};
+    if(editingId){
+      const i=txs.findIndex(x=>x.id===editingId);
+      if(i>-1) txs[i]=tx; else txs.push(tx);
+    }else{
+      txs.push(tx);
+    }
     writeCache();
     closeForm(); populateYearSelects(); renderLedger();
     setStatus('synced');
   }catch(err){
     console.error(err);
-    setStatus('error','Save failed — transaction not recorded');
+    setStatus('error','Save failed — '+(editingId?'changes not saved':'transaction not recorded'));
     alert('Could not save: '+(err.message||err));
   }finally{
     btn.disabled=false; btn.textContent='Save';
