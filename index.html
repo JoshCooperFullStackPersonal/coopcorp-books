@@ -215,7 +215,7 @@
     </div>
     <div class="field"><label>Date</label><input type="date" id="f-date"></div>
     <div class="field"><label>Description</label><input type="text" id="f-desc" placeholder="e.g. Monthly retainer - Skoop"></div>
-    <div class="field"><label>Category</label><select id="f-cat"></select></div>
+    <div class="field"><label>Category</label><select id="f-cat" onchange="catSelectChange()"></select></div>
     <div class="field"><label>Amount ($)</label><input type="number" id="f-amount" step="0.01" min="0.01" placeholder="0.00"></div>
     <div class="modal-actions">
       <button class="btn-secondary" onclick="closeForm()">Cancel</button>
@@ -234,8 +234,16 @@ const SUPABASE_URL      = 'https://ptzcbpjjggiqarmgsdqd.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_OxKZWB_8x-1kJCJboE69fQ_g9zGBvDf';  // publishable key — safe in public pages
 /* ============================================================ */
 
-const INCOME_CATS = ['Consulting - Skoop','Consulting - Torque','Consulting - Aprevida','Consulting - Other','Aviation Services','Reimbursements received'];
-const EXPENSE_CATS = ['Vehicle - Fuel/EV','Vehicle - Insurance','Vehicle - Registration','Vehicle - Maintenance','Office','Equipment','Software/Subscriptions','Professional Services','Professional Training','Meals & Entertainment','Marketing & Advertising','Travel','Payroll - Owner W-2','Payroll Taxes','Contractor Payments','Fees & Licensing','Bank Fees','Other'];
+const DEFAULT_INCOME_CATS = ['Consulting - Skoop','Consulting - Torque','Consulting - Aprevida','Consulting - Other','Aviation Services','Reimbursements received'];
+const DEFAULT_EXPENSE_CATS = ['Vehicle - Fuel/EV','Vehicle - Insurance','Vehicle - Registration','Vehicle - Maintenance','Office','Equipment','Software/Subscriptions','Professional Services','Professional Training','Meals & Entertainment','Marketing & Advertising','Travel','Payroll - Owner W-2','Payroll Taxes','Contractor Payments','Fees & Licensing','Bank Fees','Other'];
+// Live category lists = built-in defaults + user-added custom categories (persisted in settings.categories)
+let customCats = {income:[], expense:[]};
+let INCOME_CATS = [...DEFAULT_INCOME_CATS];
+let EXPENSE_CATS = [...DEFAULT_EXPENSE_CATS];
+function rebuildCats(){
+  INCOME_CATS  = [...DEFAULT_INCOME_CATS,  ...customCats.income];
+  EXPENSE_CATS = [...DEFAULT_EXPENSE_CATS, ...customCats.expense];
+}
 
 let sb = null;
 let txs = [], bs = {}, ein = '';
@@ -247,13 +255,17 @@ function loadCache(){
     txs = JSON.parse(localStorage.getItem('coop_txs')||'[]');
     bs  = JSON.parse(localStorage.getItem('coop_bs')||'{}');
     ein = localStorage.getItem('coop_ein')||'';
-  }catch(e){ txs=[]; bs={}; ein=''; }
+    const c = JSON.parse(localStorage.getItem('coop_cats')||'{"income":[],"expense":[]}');
+    customCats = {income:Array.isArray(c.income)?c.income:[], expense:Array.isArray(c.expense)?c.expense:[]};
+  }catch(e){ txs=[]; bs={}; ein=''; customCats={income:[],expense:[]}; }
+  rebuildCats();
 }
 function writeCache(){
   try{
     localStorage.setItem('coop_txs',JSON.stringify(txs));
     localStorage.setItem('coop_bs',JSON.stringify(bs));
     localStorage.setItem('coop_ein',ein);
+    localStorage.setItem('coop_cats',JSON.stringify(customCats));
   }catch(e){}
 }
 
@@ -325,6 +337,9 @@ async function loadData(){
     if(e2) throw e2;
     bs  = (setData && setData.balance_sheet) || {};
     ein = (setData && setData.ein) || '';
+    const c = setData && setData.categories;
+    customCats = {income:(c&&Array.isArray(c.income))?c.income:[], expense:(c&&Array.isArray(c.expense))?c.expense:[]};
+    rebuildCats();
 
     writeCache();
     document.getElementById('ein-display').textContent = ein||'click to add';
@@ -341,8 +356,14 @@ async function loadData(){
 async function saveSettings(){
   setStatus('busy','Saving…');
   try{
-    const { error } = await sb.from('settings')
-      .upsert({ein, balance_sheet:bs, updated_at:new Date().toISOString()},{onConflict:'user_id'});
+    let { error } = await sb.from('settings')
+      .upsert({ein, balance_sheet:bs, categories:customCats, updated_at:new Date().toISOString()},{onConflict:'user_id'});
+    // Fallback: if the optional `categories` column isn't in the DB yet, save without it
+    // so EIN / balance-sheet saving never breaks.
+    if(error && (error.code==='42703' || /categories/.test(error.message||''))){
+      ({ error } = await sb.from('settings')
+        .upsert({ein, balance_sheet:bs, updated_at:new Date().toISOString()},{onConflict:'user_id'}));
+    }
     if(error) throw error;
     writeCache();
     setStatus('synced');
@@ -405,8 +426,8 @@ function populateYearSelects(){
     years.forEach(y=>{ const o=document.createElement('option'); o.value=y; o.text=y; sel.appendChild(o); });
     if(years.includes(cur)) sel.value=cur;
   });
-  document.getElementById('fcat-income').innerHTML  = INCOME_CATS.map(c=>`<option value="${c}">${c}</option>`).join('');
-  document.getElementById('fcat-expense').innerHTML = EXPENSE_CATS.map(c=>`<option value="${c}">${c}</option>`).join('');
+  document.getElementById('fcat-income').innerHTML  = INCOME_CATS.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  document.getElementById('fcat-expense').innerHTML = EXPENSE_CATS.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
 }
 
 /* ---------- Ledger ---------- */
@@ -477,7 +498,28 @@ function setType(t){
   document.getElementById('type-expense').className='type-btn'+(t==='expense'?' t-expense':'');
   const sel=document.getElementById('f-cat');
   const cats=t==='income'?INCOME_CATS:EXPENSE_CATS;
-  sel.innerHTML=cats.map(c=>`<option>${c}</option>`).join('');
+  sel.innerHTML=cats.map(c=>`<option>${escapeHtml(c)}</option>`).join('')
+    +'<option value="__new__">➕ Add new category…</option>';
+}
+
+// Triggered when the category dropdown changes — opens the "add category" flow
+function catSelectChange(){
+  if(document.getElementById('f-cat').value==='__new__') addCategory();
+}
+
+async function addCategory(){
+  const sel=document.getElementById('f-cat');
+  const list=formType==='income'?INCOME_CATS:EXPENSE_CATS;
+  const name=(prompt('Name for the new '+formType+' category:')||'').trim();
+  if(!name || name==='__new__'){ sel.selectedIndex=0; return; }
+  const existing=list.find(c=>c.toLowerCase()===name.toLowerCase());
+  if(existing){ alert('That category already exists.'); sel.value=existing; return; }
+  customCats[formType].push(name);
+  rebuildCats();
+  setType(formType);       // rebuild the dropdown so the new category appears
+  sel.value=name;          // and select it
+  populateYearSelects();   // refresh the ledger's category filter
+  await saveSettings();    // persist to the cloud so it's there on every device
 }
 
 async function saveTx(){
@@ -520,7 +562,7 @@ function exportJSON(){
 function exportCSV(){
   const list=filterTxs();
   const rows=[['Date','Description','Category','Type','Amount'],
-    ...list.map(t=>[t.date,'"'+t.desc.replace(/"/g,'""')+'"',t.cat,t.type,t.amount.toFixed(2)])];
+    ...list.map(t=>[t.date,'"'+t.desc.replace(/"/g,'""')+'"','"'+t.cat.replace(/"/g,'""')+'"',t.type,t.amount.toFixed(2)])];
   const csv=rows.map(r=>r.join(',')).join('\n');
   const a=document.createElement('a');
   a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
